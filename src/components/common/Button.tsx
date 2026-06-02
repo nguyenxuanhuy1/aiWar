@@ -18,7 +18,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const baseClasses = `
-    inline-flex items-center justify-center font-sans font-medium rounded-xl 
+    inline-flex items-center justify-center font-sans font-medium rounded-none 
     cursor-pointer transition-all duration-150 relative border border-transparent 
     gap-2 select-none whitespace-nowrap active:scale-[0.98] 
     disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
@@ -32,19 +32,16 @@ export function Button({
 
   const variantClasses = {
     primary: `
-      bg-primary text-white shadow-[0_4px_14px_var(--primary-glow)] 
-      hover:bg-primary-hover hover:shadow-[0_6px_20px_var(--primary-glow)] 
-      hover:-translate-y-[1px] active:translate-y-0
+      bg-primary text-white 
+      hover:bg-primary-hover 
     `,
     secondary: `
       bg-theme-demo-bg border border-theme-demo-border text-theme-text-primary
       hover:bg-theme-border/20 hover:border-theme-border-hover 
-      hover:-translate-y-[1px] active:translate-y-0
     `,
     danger: `
-      bg-red-500 text-white shadow-[0_4px_14px_rgba(239,68,68,0.4)] 
-      hover:bg-red-600 hover:shadow-[0_6px_20px_rgba(239,68,68,0.6)] 
-      hover:-translate-y-[1px] active:translate-y-0
+      bg-red-500 text-white 
+      hover:bg-red-600 
     `,
     ghost: `
       bg-transparent text-theme-text-secondary 

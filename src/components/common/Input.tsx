@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -7,10 +7,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, className = '', id, ...props }, ref) => {
-    const inputId = id || `input-${Math.random().toString(36).substring(2, 11)}`;
+    const defaultId = useId();
+    const inputId = id || defaultId;
     
     const inputClasses = `
-      font-sans bg-theme-input-bg border border-theme-input-border rounded-xl px-4 py-[14px] 
+      font-sans bg-theme-input-bg border border-theme-input-border rounded-none px-4 py-[14px] 
       text-[15px] text-theme-text-primary transition-all duration-300 outline-none
       placeholder:text-theme-text-muted/60 
       focus:bg-primary/5 focus:border-primary focus:ring-4 focus:ring-primary/15
