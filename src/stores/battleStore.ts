@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { BattleState, Tile, Kingdom, RoundLog, AttackLine, BattleStatus, TileType, ActionType, VisualEffect } from '@/types/battle';
+import { BattleState, Tile, Kingdom, RoundLog, AttackLine, BattleStatus, TileType, ActionType, VisualEffect, Alliance, Dialogue } from '@/types/battle';
 import { getKingdomColorStyles } from '@/utils/tileUtils';
 
 interface BattleStore {
@@ -18,7 +18,7 @@ interface BattleStore {
   startLocalSimulation: (maxRound: number, kingdomsConfig: Array<{ name: string; model: string }>) => void;
   stopLocalSimulation: () => void;
   resumeLocalSimulation: () => void;
-  triggerNextSimulationRound: () => void;
+  triggerNextSimulationRound: (force?: boolean) => void;
 }
 
 let simulationInterval: NodeJS.Timeout | null = null;
@@ -66,10 +66,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     set({ isSimulating: true });
     // Trigger right away
     get().triggerNextSimulationRound();
-    // Re-establish timer
+    // Re-establish timer (Slower pace: 6.5s per round to read dialogues)
     simulationInterval = setInterval(() => {
       get().triggerNextSimulationRound();
-    }, 4800);
+    }, 6500);
   },
 
   startLocalSimulation: (maxRound = 50, kingdomsConfig) => {
@@ -117,14 +117,26 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const tiles: Tile[] = [];
     const tileTypes: TileType[] = ['PLAIN', 'FARM', 'GOLD_MINE', 'FOREST', 'MOUNTAIN'];
     
-    // Capital spawn points for up to 5 kingdoms
-    const capitalSpots = [
+    // Capital spawn points optimized for 2, 3, or 4 kingdoms
+    let capitalSpots = [
       { x: 1, y: 1 }, // corner 1
+      { x: 8, y: 8 }, // corner 4
       { x: 8, y: 1 }, // corner 2
       { x: 1, y: 8 }, // corner 3
-      { x: 8, y: 8 }, // corner 4
-      { x: 5, y: 5 }, // center
     ];
+
+    if (kingdoms.length === 3) {
+      capitalSpots = [
+        { x: 1, y: 1 },
+        { x: 8, y: 8 },
+        { x: 8, y: 1 },
+      ];
+    } else if (kingdoms.length === 2) {
+      capitalSpots = [
+        { x: 1, y: 1 },
+        { x: 8, y: 8 },
+      ];
+    }
 
     for (let y = 0; y < 10; y++) {
       for (let x = 0; x < 10; x++) {
@@ -194,7 +206,10 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           createdAt: new Date().toLocaleTimeString()
         }
       ],
-      visualEffects: []
+      visualEffects: [],
+      alliances: [],
+      activeDialogue: null,
+      activeGlobalEffect: null
     };
 
     set({ 
@@ -204,16 +219,16 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       activeAttackLines: []
     });
 
-    // Start interval
+    // Start interval (Slower pace: 6.5s per round to read dialogues)
     simulationInterval = setInterval(() => {
       get().triggerNextSimulationRound();
-    }, 4800);
+    }, 6500);
   },
 
-  triggerNextSimulationRound: () => {
+  triggerNextSimulationRound: (force = false) => {
     const { battleState, isSimulating } = get();
-    console.log('Zustand: triggerNextSimulationRound. isSimulating:', isSimulating, 'round:', battleState?.round);
-    if (!battleState || !isSimulating) return;
+    console.log('Zustand: triggerNextSimulationRound. isSimulating:', isSimulating, 'round:', battleState?.round, 'force:', force);
+    if (!battleState || (!isSimulating && !force)) return;
 
     if (battleState.round >= battleState.maxRound) {
       // Find winner
@@ -247,6 +262,119 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
     const newLogs: RoundLog[] = [];
     const attackLines: AttackLine[] = [];
     const newVisualEffects: VisualEffect[] = [];
+    const roundEvents: Dialogue[] = [];
+
+    // Filter expired alliances and register system logs for expiration
+    const currentAlliances = battleState.alliances || [];
+    const activeAlliances: Alliance[] = [];
+    currentAlliances.forEach(all => {
+      if (all.expireRound <= nextRound) {
+        const k1Name = nextKingdoms.find(k => k.id === all.k1)?.name || all.k1;
+        const k2Name = nextKingdoms.find(k => k.id === all.k2)?.name || all.k2;
+        newLogs.push({
+          id: `log-alliance-expire-${all.k1}-${all.k2}-${nextRound}`,
+          roundNumber: nextRound,
+          kingdomId: 'system',
+          message: `🕊️ Hiệp ước liên minh giữa [${k1Name}] và [${k2Name}] đã hết hiệu lực.`,
+          createdAt: new Date().toLocaleTimeString()
+        });
+      } else {
+        activeAlliances.push(all);
+      }
+    });
+
+    // Step 0: Check for random disaster/plague (15% chance starting from round 2)
+    let disasterDialogue: Dialogue | null = null;
+    let activeGlobalEffect: 'PLAGUE' | 'DISASTER' | null = null;
+    if (nextRound >= 2 && Math.random() < 0.15) {
+      const aliveKingdoms = nextKingdoms.filter(k => k.alive);
+      if (aliveKingdoms.length > 0) {
+        const targetKingdom = aliveKingdoms[Math.floor(Math.random() * aliveKingdoms.length)];
+        const isPlague = Math.random() < 0.5;
+        
+        // Find a tile owned by the target kingdom to place the effect
+        const targetKingdomTiles = nextTiles.filter(t => t.ownerKingdomId === targetKingdom.id);
+        const targetTile = targetKingdomTiles.find(t => t.type === 'CAPITAL') || targetKingdomTiles[0];
+        
+        if (targetTile) {
+          if (isPlague) {
+            // Plague event
+            const soldiersLost = Math.floor(targetKingdom.soldiers * 0.3);
+            targetKingdom.soldiers = Math.max(2, targetKingdom.soldiers - soldiersLost);
+            targetKingdom.morale = Math.max(10, targetKingdom.morale - 20);
+            activeGlobalEffect = 'PLAGUE';
+            
+            newVisualEffects.push({
+              id: `effect-plague-${targetKingdom.id}-${nextRound}-${Math.random()}`,
+              x: targetTile.x,
+              y: targetTile.y,
+              text: 'DỊCH BỆNH',
+              color: '#22c55e',
+              icon: '🦠',
+              createdAt: Date.now()
+            });
+
+            disasterDialogue = {
+              type: 'DISASTER',
+              senderId: targetKingdom.id,
+              senderName: targetKingdom.name,
+              senderModel: targetKingdom.model,
+              senderColor: targetKingdom.color,
+              message: `Nguy to! Đại dịch vương quốc 🦠 đang bùng phát dữ dội! Dân chúng lầm than, quân sĩ kiệt quệ!`,
+              replyMessage: `Muôn tâu bệ hạ, chúng ta đã mất đi 30% lực lượng (${soldiersLost} binh sĩ) và sĩ khí giảm sút nghiêm trọng!`,
+              targetTileCode: targetTile.code
+            };
+
+            newLogs.push({
+              id: `log-disaster-${targetKingdom.id}-${nextRound}`,
+              roundNumber: nextRound,
+              kingdomId: 'system',
+              message: `☣️ [Dịch bệnh] Đại dịch bùng phát tại [${targetKingdom.name}]! Tiêu hao 30% binh sĩ và giảm 20 sĩ khí.`,
+              createdAt: new Date().toLocaleTimeString()
+            });
+          } else {
+            // Natural disaster
+            const suppliesLost = Math.floor(targetKingdom.supplies * 0.5);
+            const goldLost = Math.floor(targetKingdom.gold * 0.3);
+            targetKingdom.supplies = Math.max(0, targetKingdom.supplies - suppliesLost);
+            targetKingdom.gold = Math.max(0, targetKingdom.gold - goldLost);
+            activeGlobalEffect = 'DISASTER';
+            
+            const disasters = ['Siêu bão vũ trụ 🌪️', 'Lũ lụt tàn phá 🌊', 'Động đất sập lở 🌋', 'Hạn hán kéo dài ☀️'];
+            const chosenDisaster = disasters[Math.floor(Math.random() * disasters.length)];
+
+            newVisualEffects.push({
+              id: `effect-disaster-${targetKingdom.id}-${nextRound}-${Math.random()}`,
+              x: targetTile.x,
+              y: targetTile.y,
+              text: 'THIÊN TAI',
+              color: '#ef4444',
+              icon: '🌪️',
+              createdAt: Date.now()
+            });
+
+            disasterDialogue = {
+              type: 'DISASTER',
+              senderId: targetKingdom.id,
+              senderName: targetKingdom.name,
+              senderModel: targetKingdom.model,
+              senderColor: targetKingdom.color,
+              message: `Hỡi ôi! Thiên tai hoành hành [${chosenDisaster}] càn quét vương quốc của ta!`,
+              replyMessage: `Báo cáo bệ hạ! Lương thực dự trữ mất đi 50% (-${suppliesLost} 🌾) và ngân khố thiệt hại 30% (-${goldLost} 💰) để khắc phục thiên tai!`,
+              targetTileCode: targetTile.code
+            };
+
+            newLogs.push({
+              id: `log-disaster-${targetKingdom.id}-${nextRound}`,
+              roundNumber: nextRound,
+              kingdomId: 'system',
+              message: `🌪️ [Thiên tai] ${chosenDisaster} tàn phá vương quốc [${targetKingdom.name}]! Thất thoát 50% lương thảo (-${suppliesLost}) và 30% vàng (-${goldLost}).`,
+              createdAt: new Date().toLocaleTimeString()
+            });
+          }
+        }
+      }
+    }
 
     // Step 1: Collect resources for each kingdom from their tiles
     nextKingdoms.forEach(kingdom => {
@@ -321,22 +449,59 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         return;
       }
 
-      // Pick a action based on state
+      // 1. Check if there are adjacent enemy tiles (ignoring allies)
+      const adjacentEnemyTiles = nextTiles.filter(tile => {
+        if (tile.ownerKingdomId === null || tile.ownerKingdomId === kingdom.id) return false;
+        
+        // Check if allied
+        const isAllied = activeAlliances.some(all => 
+          (all.k1 === kingdom.id && all.k2 === tile.ownerKingdomId) || 
+          (all.k2 === kingdom.id && all.k1 === tile.ownerKingdomId)
+        );
+        if (isAllied) return false;
+
+        return myTiles.some(myTile => getDistance(tile.x, tile.y, myTile.x, myTile.y) === 1);
+      });
+
+      // 2. Decide action based on adjacency and state
       let chosenAction: ActionType = 'EXPAND';
       const randVal = Math.random();
-      
-      if (kingdom.soldiers > 25 && randVal < 0.45) {
-        chosenAction = 'ATTACK';
-      } else if (kingdom.gold > 50 && kingdom.supplies > 50 && randVal < 0.3) {
-        chosenAction = 'RECRUIT';
-      } else if (randVal < 0.25) {
-        chosenAction = 'EXPAND';
-      } else if (randVal < 0.5) {
-        chosenAction = 'DEFEND';
-      } else if (randVal < 0.75) {
-        chosenAction = 'RESEARCH';
+
+      if (adjacentEnemyTiles.length > 0) {
+        // Bordering an enemy: focus on war and defense
+        if (kingdom.soldiers >= 10) {
+          if (randVal < 0.65) {
+            chosenAction = 'ATTACK';
+          } else if (randVal < 0.85) {
+            chosenAction = 'RECRUIT';
+          } else if (randVal < 0.95) {
+            chosenAction = 'DEFEND';
+          } else {
+            chosenAction = 'DIPLOMACY';
+          }
+        } else {
+          // Weak: recruit and defend
+          if (randVal < 0.55) {
+            chosenAction = 'RECRUIT';
+          } else if (randVal < 0.85) {
+            chosenAction = 'DEFEND';
+          } else if (randVal < 0.95) {
+            chosenAction = 'ATTACK';
+          } else {
+            chosenAction = 'DIPLOMACY';
+          }
+        }
       } else {
-        chosenAction = 'DIPLOMACY';
+        // No bordering enemy: expand and tech up
+        if (randVal < 0.55) {
+          chosenAction = 'EXPAND';
+        } else if (randVal < 0.80) {
+          chosenAction = 'RESEARCH';
+        } else if (randVal < 0.90) {
+          chosenAction = 'RECRUIT';
+        } else {
+          chosenAction = 'DIPLOMACY';
+        }
       }
 
       // Execute Action
@@ -356,6 +521,8 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           kingdom.energy = Math.max(0, kingdom.energy - 15);
           kingdom.score += 15;
 
+          const sourceTile = myTiles.find(myTile => getDistance(targetTile.x, targetTile.y, myTile.x, myTile.y) === 1) || myTiles[0];
+
           newVisualEffects.push({
             id: `effect-${kingdom.id}-${nextRound}-${Math.random()}`,
             x: targetTile.x,
@@ -363,7 +530,23 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
             text: 'EXPAND',
             color: '#ec4899',
             icon: '🚩',
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            type: 'EXPAND',
+            senderId: kingdom.id,
+            senderName: kingdom.name,
+            partnerX: sourceTile.x,
+            partnerY: sourceTile.y
+          });
+
+          roundEvents.push({
+            type: 'EXPAND',
+            senderId: kingdom.id,
+            senderName: kingdom.name,
+            senderModel: kingdom.model,
+            senderColor: kingdom.color,
+            message: `Hỡi quân sĩ! Hãy cắm cờ và mở rộng bờ cõi vương quốc tại ô [${targetTile.code}]!`,
+            replyMessage: `Tuân lệnh hoàng thượng! Quân ta đã thiết lập cột mốc khai hoang ô [${targetTile.code}].`,
+            targetTileCode: targetTile.code
           });
 
           newLogs.push({
@@ -381,7 +564,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       }
 
       if (chosenAction === 'RECRUIT') {
-        const cost = 25;
+        const cost = 12;
         if (kingdom.gold >= cost && kingdom.supplies >= cost) {
           kingdom.gold -= cost;
           kingdom.supplies -= cost;
@@ -414,9 +597,17 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       }
 
       if (chosenAction === 'ATTACK') {
-        // Find adjacent enemy tiles
+        // Find adjacent enemy tiles, skipping allied kingdoms
         const adjacentEnemy = nextTiles.filter(tile => {
           if (tile.ownerKingdomId === null || tile.ownerKingdomId === kingdom.id) return false;
+          
+          // Check if allied
+          const isAllied = activeAlliances.some(all => 
+            (all.k1 === kingdom.id && all.k2 === tile.ownerKingdomId) || 
+            (all.k2 === kingdom.id && all.k1 === tile.ownerKingdomId)
+          );
+          if (isAllied) return false;
+
           return myTiles.some(myTile => getDistance(tile.x, tile.y, myTile.x, myTile.y) === 1);
         });
 
@@ -458,7 +649,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
           const defensePower = (defender.soldiers * 0.4 + targetTile.defenseBonus * 3) * (0.5 + Math.random()) * (1 + defender.tech * 0.1);
 
           if (attackPower > defensePower) {
-            // Conquer tile
+            // Conquer tile & Loot resources
             targetTile.ownerKingdomId = kingdom.id;
             const lostSoldiers = Math.floor(kingdom.soldiers * 0.3);
             kingdom.soldiers = Math.max(5, kingdom.soldiers - lostSoldiers);
@@ -469,13 +660,47 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
             kingdom.score += 40;
             defender.score = Math.max(0, defender.score - 20);
 
+            // Looting Mechanic (Steal 30% of gold and 30% of supplies)
+            const lootedGold = Math.floor(defender.gold * 0.3);
+            const lootedSupplies = Math.floor(defender.supplies * 0.3);
+            defender.gold = Math.max(0, defender.gold - lootedGold);
+            defender.supplies = Math.max(0, defender.supplies - lootedSupplies);
+            kingdom.gold += lootedGold;
+            kingdom.supplies += lootedSupplies;
+
+            // Add floating visual effect for loot
+            newVisualEffects.push({
+              id: `effect-loot-${kingdom.id}-${nextRound}-${Math.random()}`,
+              x: targetTile.x,
+              y: targetTile.y,
+              text: `Cướp +${lootedGold}💰 +${lootedSupplies}🌾`,
+              color: '#f59e0b', // Amber/orange gold loot color
+              icon: '💰',
+              createdAt: Date.now()
+            });
+
+            roundEvents.push({
+              type: 'ATTACK',
+              senderId: kingdom.id,
+              senderName: kingdom.name,
+              senderModel: kingdom.model,
+              senderColor: kingdom.color,
+              receiverId: defender.id,
+              receiverName: defender.name,
+              receiverModel: defender.model,
+              receiverColor: defender.color,
+              message: `Toàn quân tiến công! Đánh sập cứ điểm ô [${targetTile.code}] của [${defender.name}], cướp bóc được ${lootedGold} vàng và ${lootedSupplies} lương thảo!`,
+              replyMessage: `Nguy to! Đại bản doanh ô [${targetTile.code}] thất thủ! Kho tàng bị cướp mất ${lootedGold} vàng và ${lootedSupplies} lương thảo!`,
+              targetTileCode: targetTile.code
+            });
+
             newLogs.push({
               id: `log-act-${kingdom.id}-${nextRound}`,
               roundNumber: nextRound,
               kingdomId: kingdom.id,
               actionJson: { type: 'ATTACK', targetTileCode: targetTile.code },
-              resultJson: { success: true },
-              message: `⚔️ [${kingdom.name}] điều quân tấn công đánh chiếm thành công ô [${targetTile.code}] từ tay [${defender.name}]!`,
+              resultJson: { success: true, lootedGold, lootedSupplies },
+              message: `⚔️ [${kingdom.name}] điều quân tấn công chiếm đóng thành công ô [${targetTile.code}] từ tay [${defender.name}], cướp được ${lootedGold} vàng và ${lootedSupplies} lương thảo!`,
               createdAt: new Date().toLocaleTimeString()
             });
 
@@ -505,6 +730,21 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
               resultJson: { success: false },
               message: `🛡️ [${kingdom.name}] điều quân vây hãm [${targetTile.code}] của [${defender.name}] nhưng thất bại và tổn hao [${lostSoldiers}] binh sĩ.`,
               createdAt: new Date().toLocaleTimeString()
+            });
+
+            roundEvents.push({
+              type: 'ATTACK',
+              senderId: kingdom.id,
+              senderName: kingdom.name,
+              senderModel: kingdom.model,
+              senderColor: kingdom.color,
+              receiverId: defender.id,
+              receiverName: defender.name,
+              receiverModel: defender.model,
+              receiverColor: defender.color,
+              message: `Vây hãm ô [${targetTile.code}] của [${defender.name}]! Các chiến binh, tiến lên!`,
+              replyMessage: `Phản công! Hệ thống lá chắn của chúng ta kiên cố như bàn thạch! Rút lui đi hỡi quân [${kingdom.name}]!`,
+              targetTileCode: targetTile.code
             });
           }
         }
@@ -575,29 +815,99 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       if (chosenAction === 'DIPLOMACY') {
         const goldCost = 20;
         if (kingdom.gold >= goldCost) {
-          kingdom.gold -= goldCost;
-          kingdom.morale = Math.min(100, kingdom.morale + 15);
-          kingdom.score += 5;
+          // Find another alive kingdom that is NOT currently allied
+          const otherKingdoms = nextKingdoms.filter(k => k.alive && k.id !== kingdom.id && !activeAlliances.some(all => 
+            (all.k1 === kingdom.id && all.k2 === k.id) || (all.k2 === kingdom.id && all.k1 === k.id)
+          ));
 
-          const capitalTile = nextTiles.find(t => t.ownerKingdomId === kingdom.id && t.type === 'CAPITAL') || myTiles[0];
-          newVisualEffects.push({
-            id: `effect-${kingdom.id}-${nextRound}-${Math.random()}`,
-            x: capitalTile.x,
-            y: capitalTile.y,
-            text: '+15 MORALE',
-            color: '#10b981',
-            icon: '🤝',
-            createdAt: Date.now()
-          });
+          if (otherKingdoms.length > 0) {
+            const partner = otherKingdoms[Math.floor(Math.random() * otherKingdoms.length)];
+            
+            kingdom.gold -= goldCost;
+            kingdom.morale = Math.min(100, kingdom.morale + 10);
+            partner.morale = Math.min(100, partner.morale + 10);
+            kingdom.score += 15;
+            partner.score += 10;
+            
+            // Register alliance relationship
+            activeAlliances.push({
+              k1: kingdom.id,
+              k2: partner.id,
+              expireRound: nextRound + 3
+            });
 
-          newLogs.push({
-            id: `log-act-${kingdom.id}-${nextRound}`,
-            roundNumber: nextRound,
-            kingdomId: kingdom.id,
-            actionJson: { type: 'DIPLOMACY' },
-            message: `🤝 [${kingdom.name}] tổ chức lễ hội tăng Sĩ Khí quân đội thêm [+15].`,
-            createdAt: new Date().toLocaleTimeString()
-          });
+            // Find their capitals (or a tile they own) to draw connection lines
+            const myCapital = nextTiles.find(t => t.ownerKingdomId === kingdom.id && t.type === 'CAPITAL') || myTiles[0];
+            const partnerTiles = nextTiles.filter(t => t.ownerKingdomId === partner.id);
+            const partnerCapital = partnerTiles.find(t => t.type === 'CAPITAL') || partnerTiles[0];
+
+            if (myCapital && partnerCapital) {
+              newVisualEffects.push({
+                id: `effect-diplomacy-${kingdom.id}-${nextRound}-${Math.random()}`,
+                x: myCapital.x,
+                y: myCapital.y,
+                text: 'ALLIANCE',
+                color: '#10b981',
+                icon: '🤝',
+                createdAt: Date.now(),
+                type: 'DIPLOMACY',
+                senderId: kingdom.id,
+                senderName: kingdom.name,
+                receiverId: partner.id,
+                receiverName: partner.name,
+                partnerX: partnerCapital.x,
+                partnerY: partnerCapital.y
+              });
+            }
+
+            roundEvents.push({
+              type: 'DIPLOMACY',
+              senderId: kingdom.id,
+              senderName: kingdom.name,
+              senderModel: kingdom.model,
+              senderColor: kingdom.color,
+              receiverId: partner.id,
+              receiverName: partner.name,
+              receiverModel: partner.model,
+              receiverColor: partner.color,
+              message: `Hỡi Vua [${partner.name}]! Hãy cùng bắt tay thiết lập hiệp ước liên minh 5 lượt nhé?`,
+              replyMessage: `Vương quốc [${partner.name}] rất vinh dự! Chúng ta hãy cùng kiến tạo tương lai!`,
+            });
+
+            newLogs.push({
+              id: `log-act-${kingdom.id}-${nextRound}`,
+              roundNumber: nextRound,
+              kingdomId: kingdom.id,
+              actionJson: { type: 'DIPLOMACY' },
+              message: `🤝 [${kingdom.name}] chủ động bang giao, thiết lập liên minh 5 lượt với [${partner.name}]!`,
+              createdAt: new Date().toLocaleTimeString()
+            });
+          } else {
+            // Fallback to self festival if no partners available
+            kingdom.gold -= goldCost;
+            kingdom.morale = Math.min(100, kingdom.morale + 15);
+            kingdom.score += 5;
+
+            const capitalTile = nextTiles.find(t => t.ownerKingdomId === kingdom.id && t.type === 'CAPITAL') || myTiles[0];
+            newVisualEffects.push({
+              id: `effect-${kingdom.id}-${nextRound}-${Math.random()}`,
+              x: capitalTile.x,
+              y: capitalTile.y,
+              text: '+15 MORALE',
+              color: '#10b981',
+              icon: '🤝',
+              createdAt: Date.now()
+            });
+
+            newLogs.push({
+              id: `log-act-${kingdom.id}-${nextRound}`,
+              roundNumber: nextRound,
+              kingdomId: kingdom.id,
+              actionJson: { type: 'DIPLOMACY' },
+              message: `🤝 [${kingdom.name}] tổ chức lễ hội tăng Sĩ Khí quân đội thêm [+15].`,
+              createdAt: new Date().toLocaleTimeString()
+            });
+          }
         }
       }
     });
@@ -618,7 +928,7 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       }
     });
 
-    // Check if only 1 kingdom remains alive
+    // Check if only 1 kingdom remains alive or round limit is reached
     const aliveCount = nextKingdoms.filter(k => k.alive).length;
     let finalStatus: BattleStatus = 'RUNNING';
     let winner: Kingdom | undefined = undefined;
@@ -644,6 +954,23 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
       }
     }
 
+    // Select the most dramatic dialogue of this round
+    let selectedDialogue: Dialogue | null = null;
+    const disasters = disasterDialogue ? [disasterDialogue] : [];
+    const attacks = roundEvents.filter(e => e.type === 'ATTACK');
+    const diplomas = roundEvents.filter(e => e.type === 'DIPLOMACY');
+    const expands = roundEvents.filter(e => e.type === 'EXPAND');
+
+    if (disasters.length > 0) {
+      selectedDialogue = disasters[0];
+    } else if (attacks.length > 0) {
+      selectedDialogue = attacks[Math.floor(Math.random() * attacks.length)];
+    } else if (diplomas.length > 0) {
+      selectedDialogue = diplomas[Math.floor(Math.random() * diplomas.length)];
+    } else if (expands.length > 0) {
+      selectedDialogue = expands[Math.floor(Math.random() * expands.length)];
+    }
+
     // Set updated state
     const now = Date.now();
     const existingEffects = battleState.visualEffects || [];
@@ -659,11 +986,28 @@ export const useBattleStore = create<BattleStore>((set, get) => ({
         tiles: nextTiles,
         logs: [...battleState.logs, ...newLogs],
         winner: winner,
-        visualEffects: updatedEffects
+        visualEffects: updatedEffects,
+        alliances: activeAlliances,
+        activeDialogue: selectedDialogue,
+        activeGlobalEffect: activeGlobalEffect
       },
       activeAttackLines: attackLines,
       isSimulating: finalStatus === 'RUNNING'
     });
+
+    // Clear active dialogue after 5.5s to give UI time to display it cleanly
+    setTimeout(() => {
+      const currentBattleState = get().battleState;
+      if (currentBattleState) {
+        set({
+          battleState: {
+            ...currentBattleState,
+            activeDialogue: null,
+            activeGlobalEffect: null
+          }
+        });
+      }
+    }, 5500);
 
     // Clear attack vectors after 1.8 seconds to animate lines disappearing
     setTimeout(() => {

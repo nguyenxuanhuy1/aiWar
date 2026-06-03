@@ -9,8 +9,8 @@ export function useBattleSocket(battleId: string) {
   const isSimulating = useBattleStore((state) => state.isSimulating);
 
   useEffect(() => {
-    // If no battleId or if simulating locally, do not connect to real websocket
-    if (!battleId || battleId.startsWith('sim-') || isSimulating) {
+    // If no battleId or if simulating locally or mock mode, do not connect to real websocket
+    if (!battleId || battleId.startsWith('sim-') || battleId.startsWith('mock-') || isSimulating) {
       return;
     }
 

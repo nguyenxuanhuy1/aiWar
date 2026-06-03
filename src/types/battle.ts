@@ -64,6 +64,12 @@ export interface RoundLog {
   createdAt: string;
 }
 
+export interface Alliance {
+  k1: string;
+  k2: string;
+  expireRound: number;
+}
+
 export interface VisualEffect {
   id: string;
   x: number;
@@ -72,6 +78,28 @@ export interface VisualEffect {
   color: string;
   icon: string;
   createdAt: number;
+  type?: 'EXPAND' | 'RECRUIT' | 'ATTACK' | 'DEFEND' | 'RESEARCH' | 'DIPLOMACY';
+  senderId?: string;
+  senderName?: string;
+  receiverId?: string;
+  receiverName?: string;
+  partnerX?: number;
+  partnerY?: number;
+}
+
+export interface Dialogue {
+  type: 'EXPAND' | 'ATTACK' | 'DIPLOMACY' | 'DISASTER';
+  senderId: string;
+  senderName: string;
+  senderModel: string;
+  senderColor: string;
+  receiverId?: string;
+  receiverName?: string;
+  receiverModel?: string;
+  receiverColor?: string;
+  message: string;
+  replyMessage?: string;
+  targetTileCode?: string;
 }
 
 export interface BattleState {
@@ -85,6 +113,9 @@ export interface BattleState {
   logs: RoundLog[];
   visualEffects?: VisualEffect[]; // Floating action indicator overlays
   winner?: Kingdom;
+  alliances?: Alliance[];
+  activeDialogue?: Dialogue | null;
+  activeGlobalEffect?: 'PLAGUE' | 'DISASTER' | null;
 }
 
 export interface AttackLine {

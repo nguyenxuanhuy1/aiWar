@@ -42,6 +42,8 @@ export default function BattleRoomPage() {
   useEffect(() => {
     if (!battleId) return;
 
+    let active = true;
+
     console.log('BattleRoomPage: useEffect mounted. battleId:', battleId);
 
     if (battleId === 'simulation-arena') {
@@ -61,11 +63,17 @@ export default function BattleRoomPage() {
       const fetchInitialState = async () => {
         try {
           const state = await battleApi.getBattleState(battleId);
+          if (!active) return;
           setBattleState(state);
+          if (battleId.startsWith('mock-')) {
+            resumeLocalSimulation();
+          }
         } catch (e) {
           console.error(e);
         } finally {
-          setLoading(false);
+          if (active) {
+            setLoading(false);
+          }
         }
       };
 
@@ -73,9 +81,10 @@ export default function BattleRoomPage() {
     }
 
     return () => {
+      active = false;
       stopLocalSimulation();
     };
-  }, [battleId, startLocalSimulation, stopLocalSimulation, setBattleState]);
+  }, [battleId, startLocalSimulation, stopLocalSimulation, setBattleState, resumeLocalSimulation]);
 
 
   // Open Winner modal automatically when state status transitions to FINISHED
@@ -88,15 +97,15 @@ export default function BattleRoomPage() {
   }, [battleState?.status, battleState?.winner]);
 
   const handleManualNextStep = () => {
-    if (battleId === 'simulation-arena') {
-      triggerNextSimulationRound();
+    if (battleId === 'simulation-arena' || battleId.startsWith('mock-')) {
+      triggerNextSimulationRound(true);
     } else {
       battleApi.startBattle(battleId);
     }
   };
 
   const handleTogglePlay = () => {
-    if (battleId === 'simulation-arena') {
+    if (battleId === 'simulation-arena' || battleId.startsWith('mock-')) {
       if (isSimulating) {
         stopLocalSimulation();
       } else {
@@ -183,6 +192,9 @@ export default function BattleRoomPage() {
               setSelectedTile={setSelectedTile}
               activeAttackLines={activeAttackLines}
               visualEffects={battleState.visualEffects || []}
+              alliances={battleState.alliances || []}
+              activeDialogue={battleState.activeDialogue}
+              activeGlobalEffect={battleState.activeGlobalEffect}
             />
           </div>
 
@@ -208,7 +220,7 @@ export default function BattleRoomPage() {
             <RoundTimeline
               state={battleState}
               onNextStep={handleManualNextStep}
-              isSimulating={battleId === 'simulation-arena' ? isSimulating : false}
+              isSimulating={battleId === 'simulation-arena' || battleId.startsWith('mock-') ? isSimulating : false}
               onToggleSimulate={handleTogglePlay}
             />
           </div>
@@ -220,7 +232,9 @@ export default function BattleRoomPage() {
       <WinnerModal
         isOpen={winnerModalOpen}
         winner={battleState.winner}
-        onClose={() => setWinnerModalOpen(false)}
+        onClose={handleBackToLobby}
+        logs={battleState.logs}
+        kingdoms={battleState.kingdoms}
       />
     </div>
   );

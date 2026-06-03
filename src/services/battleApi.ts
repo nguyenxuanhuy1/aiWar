@@ -41,6 +41,9 @@ export const battleApi = {
   },
 
   getBattleState: async (battleId: string): Promise<BattleState> => {
+    if (battleId.startsWith('mock-')) {
+      return getMockBattleState(battleId);
+    }
     try {
       const response = await api.get(`/battles/${battleId}`);
       return response.data;
@@ -51,6 +54,9 @@ export const battleApi = {
   },
 
   startBattle: async (battleId: string): Promise<{ success: boolean; message: string }> => {
+    if (battleId.startsWith('mock-')) {
+      return { success: true, message: 'Local battle started' };
+    }
     try {
       const response = await api.post(`/battles/${battleId}/start`);
       return response.data;
