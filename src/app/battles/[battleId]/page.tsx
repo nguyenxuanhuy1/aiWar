@@ -222,6 +222,8 @@ export default function BattleRoomPage() {
               onNextStep={handleManualNextStep}
               isSimulating={battleId === 'simulation-arena' || battleId.startsWith('mock-') ? isSimulating : false}
               onToggleSimulate={handleTogglePlay}
+              onShowWinnerModal={() => setWinnerModalOpen(true)}
+              onLeave={handleBackToLobby}
             />
           </div>
         )}
@@ -232,7 +234,8 @@ export default function BattleRoomPage() {
       <WinnerModal
         isOpen={winnerModalOpen}
         winner={battleState.winner}
-        onClose={handleBackToLobby}
+        onClose={() => setWinnerModalOpen(false)}
+        onLeave={handleBackToLobby}
         logs={battleState.logs}
         kingdoms={battleState.kingdoms}
       />

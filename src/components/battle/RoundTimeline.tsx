@@ -8,9 +8,18 @@ interface RoundTimelineProps {
   onNextStep?: () => void;
   isSimulating: boolean;
   onToggleSimulate: () => void;
+  onShowWinnerModal?: () => void;
+  onLeave?: () => void;
 }
 
-export function RoundTimeline({ state, onNextStep, isSimulating, onToggleSimulate }: RoundTimelineProps) {
+export function RoundTimeline({ 
+  state, 
+  onNextStep, 
+  isSimulating, 
+  onToggleSimulate,
+  onShowWinnerModal,
+  onLeave 
+}: RoundTimelineProps) {
   if (!state) return null;
 
   const progress = state.maxRound > 0 ? (state.round / state.maxRound) * 100 : 0;
@@ -147,25 +156,44 @@ export function RoundTimeline({ state, onNextStep, isSimulating, onToggleSimulat
             </div>
             {/* Play/Pause Control Buttons inside minimap card */}
             <div className="flex gap-2.5 mt-1">
-              <button
-                onClick={onToggleSimulate}
-                className={`
-                  px-3 py-1.5 text-[9px] font-black uppercase rounded cursor-pointer tracking-wider outline-none transition-colors border
-                  ${isSimulating 
-                    ? 'bg-red-500/15 border-red-500/20 text-red-400 hover:bg-red-500/35' 
-                    : 'bg-primary/15 border-primary/20 text-primary hover:bg-primary/35'
-                  }
-                `}
-              >
-                {isSimulating ? 'Pause II' : 'Resume ▶'}
-              </button>
-              {onNextStep && !isSimulating && state.status === 'RUNNING' && (
-                <button
-                  onClick={onNextStep}
-                  className="px-2.5 py-1.5 bg-white/5 border border-white/5 hover:bg-white/10 text-[9px] font-black uppercase text-theme-text-primary rounded cursor-pointer transition-colors"
-                >
-                  Step ⏭️
-                </button>
+              {state.status === 'FINISHED' ? (
+                <>
+                  <button
+                    onClick={onShowWinnerModal}
+                    className="px-3 py-1.5 bg-yellow-500/15 border border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/35 text-[9px] font-black uppercase rounded cursor-pointer tracking-wider outline-none transition-colors border"
+                  >
+                    Xem Kết Quả 🏆
+                  </button>
+                  <button
+                    onClick={onLeave}
+                    className="px-3 py-1.5 bg-red-500/15 border border-red-500/20 text-red-400 hover:bg-red-500/35 text-[9px] font-black uppercase rounded cursor-pointer tracking-wider outline-none transition-colors border"
+                  >
+                    Thoát 🚪
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={onToggleSimulate}
+                    className={`
+                      px-3 py-1.5 text-[9px] font-black uppercase rounded cursor-pointer tracking-wider outline-none transition-colors border
+                      ${isSimulating 
+                        ? 'bg-red-500/15 border-red-500/20 text-red-400 hover:bg-red-500/35' 
+                        : 'bg-primary/15 border-primary/20 text-primary hover:bg-primary/35'
+                      }
+                    `}
+                  >
+                    {isSimulating ? 'Pause II' : 'Resume ▶'}
+                  </button>
+                  {onNextStep && !isSimulating && state.status === 'RUNNING' && (
+                    <button
+                      onClick={onNextStep}
+                      className="px-2.5 py-1.5 bg-white/5 border border-white/5 hover:bg-white/10 text-[9px] font-black uppercase text-theme-text-primary rounded cursor-pointer transition-colors"
+                    >
+                      Step ⏭️
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

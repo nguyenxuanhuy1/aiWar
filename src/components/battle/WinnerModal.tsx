@@ -8,11 +8,12 @@ interface WinnerModalProps {
   isOpen: boolean;
   winner?: Kingdom;
   onClose: () => void;
+  onLeave: () => void;
   logs: RoundLog[];
   kingdoms: Kingdom[];
 }
 
-export function WinnerModal({ isOpen, winner, onClose, logs, kingdoms }: WinnerModalProps) {
+export function WinnerModal({ isOpen, winner, onClose, onLeave, logs, kingdoms }: WinnerModalProps) {
   const [showHistory, setShowHistory] = React.useState(false);
 
   React.useEffect(() => {
@@ -117,8 +118,11 @@ export function WinnerModal({ isOpen, winner, onClose, logs, kingdoms }: WinnerM
                   <Button onClick={() => setShowHistory(false)} variant="secondary" className="flex-1 font-bold">
                     ⬅️ Quay lại
                   </Button>
-                  <Button onClick={onClose} variant="primary" className="flex-1 font-bold">
-                    Thoát Phòng 🏠
+                  <Button onClick={onClose} variant="secondary" className="flex-1 font-bold">
+                    Xem Bản Đồ 🗺️
+                  </Button>
+                  <Button onClick={onLeave} variant="primary" className="flex-1 font-bold">
+                    Thoát 🚪
                   </Button>
                 </div>
               </div>
@@ -206,8 +210,11 @@ export function WinnerModal({ isOpen, winner, onClose, logs, kingdoms }: WinnerM
                   <Button onClick={() => setShowHistory(true)} variant="secondary" className="flex-1 font-bold text-xs py-2.5">
                     Xem lại diễn biến 📜
                   </Button>
-                  <Button onClick={onClose} variant="primary" className="flex-1 font-bold text-xs py-2.5">
-                    Quay lại Lobby 🏠
+                  <Button onClick={onClose} variant="secondary" className="flex-1 font-bold text-xs py-2.5">
+                    Xem Bản Đồ 🗺️
+                  </Button>
+                  <Button onClick={onLeave} variant="primary" className="flex-1 font-bold text-xs py-2.5">
+                    Thoát 🚪
                   </Button>
                 </div>
               </div>
