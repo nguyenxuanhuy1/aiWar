@@ -30,6 +30,7 @@ export interface Kingdom {
   score: number;
   scoreHistory: number[]; // Track score over rounds for line chart
   alive: boolean;
+  ready?: boolean;
   color: string;
 }
 

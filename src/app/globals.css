@@ -128,5 +128,242 @@ body {
   animation: pulseGlow 8s ease-in-out infinite;
 }
 
+/* Battle Map Animations */
+@keyframes combat-explosion {
+  0% {
+    r: 2px;
+    opacity: 0;
+    stroke-width: 3px;
+    fill: rgba(255, 255, 255, 0.8);
+  }
+  70% {
+    r: 20px;
+    opacity: 1;
+    stroke-width: 2px;
+    fill: rgba(239, 68, 68, 0.2);
+  }
+  100% {
+    r: 32px;
+    opacity: 0;
+    stroke-width: 0.5px;
+    fill: rgba(255, 255, 255, 0);
+  }
+}
+.animate-combat-explosion {
+  transform-origin: center;
+  opacity: 0;
+  animation: combat-explosion 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) 1.2s 1 forwards;
+}
 
+@keyframes explosion-emoji {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1.4);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+.animate-explosion-emoji {
+  opacity: 0;
+  transform-origin: center;
+  animation: explosion-emoji 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 1.2s 1 forwards;
+}
+
+@keyframes float-event-badge {
+  0% {
+    transform: translateY(15px) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    transform: translateY(-5px) scale(1.1);
+    opacity: 1;
+  }
+  30% {
+    transform: translateY(-8px) scale(1);
+    opacity: 1;
+  }
+  85% {
+    transform: translateY(-12px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-20px) scale(0.7);
+    opacity: 0;
+  }
+}
+.animate-float-event-badge {
+  transform-origin: center;
+  animation: float-event-badge 1.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes soldiers-cheer {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px) scaleY(1.05); }
+}
+.animate-soldiers-cheer {
+  transform-origin: bottom;
+  animation: soldiers-cheer 0.6s ease-in-out infinite;
+}
+
+@keyframes recruit-march {
+  0% { transform: translateY(6px) scale(0.6); opacity: 0; }
+  50% { transform: translateY(0px) scale(1); opacity: 1; }
+  100% { transform: translateY(-6px) scale(0.7); opacity: 0; }
+}
+.animate-recruit-march {
+  animation: recruit-march 1.5s ease-in-out infinite;
+}
+
+@keyframes bulb-glow {
+  0%, 100% { fill: #f59e0b; filter: drop-shadow(0 0 1px #fbbf24); }
+  50% { fill: #fef08a; filter: drop-shadow(0 0 6px #fbbf24); }
+}
+.animate-bulb-glow {
+  animation: bulb-glow 0.8s ease-in-out infinite;
+}
+
+@keyframes gear-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-gear-spin {
+  transform-origin: 9px 6px;
+  animation: gear-spin 4s linear infinite;
+}
+
+@keyframes gear-spin-rev {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+.animate-gear-spin-rev {
+  transform-origin: -9px 6px;
+  animation: gear-spin-rev 3s linear infinite;
+}
+
+@keyframes wall-rise {
+  0% { transform: scaleY(0); opacity: 0; }
+  45%, 100% { transform: scaleY(1); opacity: 1; }
+}
+.animate-wall-rise {
+  transform-origin: bottom;
+  animation: wall-rise 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes flag-plant {
+  0% { transform: translateY(-20px) scale(0.8); opacity: 0; }
+  35% { transform: translateY(0) scale(1); opacity: 1; }
+  55% { transform: rotate(-6deg); }
+  75% { transform: rotate(6deg); }
+  95%, 100% { transform: rotate(0deg); }
+}
+.animate-flag-plant {
+  transform-origin: bottom;
+  animation: flag-plant 1.6s ease-out forwards;
+}
+
+@keyframes alliance-handshake {
+  0% { transform: scale(0); opacity: 0; }
+  20% { transform: scale(1.4); opacity: 1; }
+  80% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.6); opacity: 0; }
+}
+.animate-alliance-handshake {
+  transform-origin: center;
+  opacity: 0;
+  animation: alliance-handshake 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes novel-slide-up-center {
+  0% { transform: translate(-50%, calc(-50% + 30px)); opacity: 0; }
+  100% { transform: translate(-50%, -50%); opacity: 1; }
+}
+.animate-novel-slide-up-center {
+  animation: novel-slide-up-center 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes novel-slide-up-corner {
+  0% { transform: translateY(30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.animate-novel-slide-up-corner {
+  animation: novel-slide-up-corner 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes hologram-scan {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 480px; }
+}
+.animate-hologram-scan {
+  animation: hologram-scan 8s linear infinite;
+}
+
+@keyframes dialog-line-1 {
+  0% { transform: translateX(-10px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+.animate-dialog-line-1 {
+  animation: dialog-line-1 0.4s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
+@keyframes dialog-line-2 {
+  0% { transform: translateX(10px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+.animate-dialog-line-2 {
+  animation: dialog-line-2 0.4s ease-out 1.2s forwards;
+  opacity: 0;
+}
+
+@keyframes plague-pulse {
+  0%, 100% { fill: rgba(34, 197, 94, 0.12); }
+  50% { fill: rgba(34, 197, 94, 0.22); }
+}
+.animate-plague-pulse {
+  animation: plague-pulse 3s ease-in-out infinite;
+}
+
+@keyframes float-slow-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(15px, -20px) scale(1.15); }
+}
+@keyframes float-slow-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-25px, -15px) scale(0.9); }
+}
+@keyframes float-slow-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(20px, 20px) scale(1.1); }
+}
+.animate-float-slow-1 {
+  transform-origin: center;
+  animation: float-slow-1 6s ease-in-out infinite;
+}
+.animate-float-slow-2 {
+  transform-origin: center;
+  animation: float-slow-2 8s ease-in-out infinite;
+}
+.animate-float-slow-3 {
+  transform-origin: center;
+  animation: float-slow-3 7s ease-in-out infinite;
+}
+
+@keyframes storm-clouds {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(30px); }
+  100% { transform: translateX(0); }
+}
+.animate-storm-clouds {
+  animation: storm-clouds 12s ease-in-out infinite;
+}
 

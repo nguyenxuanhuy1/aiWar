@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
         source: '/api/users/:path*',
         destination: `${BACKEND_URL}/api/users/:path*`,
       },
+      {
+        source: '/api/battles/:path*',
+        destination: `${BACKEND_URL}/api/battles/:path*`,
+      },
     ];
   },
 };

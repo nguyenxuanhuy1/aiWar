@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useBattleStore } from '@/stores/battleStore';
-import { Dialogue } from '@/types/battle';
+import { Kingdom, Tile } from '@/types/battle';
+import { battleApi } from '@/services/battleApi';
 
 export function useBattleSocket(battleId: string) {
+  const router = useRouter();
   const setBattleState = useBattleStore((state) => state.setBattleState);
   const appendLog = useBattleStore((state) => state.appendLog);
   const setConnected = useBattleStore((state) => state.setConnected);
@@ -45,7 +48,7 @@ export function useBattleSocket(battleId: string) {
         };
 
         ws.onerror = (err) => {
-          console.error('[WebSocket] Error:', err);
+          console.warn('[WebSocket] Error:', err);
         };
 
         ws.onmessage = (event) => {
@@ -55,22 +58,84 @@ export function useBattleSocket(battleId: string) {
             const { type, payload } = message;
             console.log('[WebSocket] Event Received:', type, payload);
 
+            if (type === 'PLAYER_JOINED' || type === 'LOBBY_UPDATE') {
+              const currentBattleState = useBattleStore.getState().battleState;
+              if (currentBattleState) {
+                setBattleState({
+                  ...currentBattleState,
+                  kingdoms: payload.kingdoms
+                });
+              }
+              appendLog({
+                id: `log-lobby-update-${Date.now()}`,
+                roundNumber: currentBattleState?.round || 0,
+                kingdomId: 'system',
+                message: `👥 Cập nhật phòng chờ! Sĩ số hiện tại: ${payload.kingdoms.length}/4.`,
+                createdAt: new Date().toLocaleTimeString()
+              });
+              return;
+            }
+
+            if (type === 'PLAYER_KICKED') {
+              const myKingdomId = typeof window !== 'undefined' ? sessionStorage.getItem(`kingdomId-${battleId}`) : null;
+              if (payload.kickedKingdomId === myKingdomId) {
+                alert('Bạn đã bị đuổi khỏi phòng đấu! 🚪');
+                if (typeof window !== 'undefined') {
+                  sessionStorage.removeItem(`joined-${battleId}`);
+                  sessionStorage.removeItem(`kingdomId-${battleId}`);
+                }
+                router.push('/');
+              } else {
+                const currentBattleState = useBattleStore.getState().battleState;
+                const kickedK = currentBattleState?.kingdoms.find(k => k.id === payload.kickedKingdomId);
+                
+                // Remove player from local state list
+                if (currentBattleState) {
+                  setBattleState({
+                    ...currentBattleState,
+                    kingdoms: currentBattleState.kingdoms.filter(k => k.id !== payload.kickedKingdomId)
+                  });
+                }
+                
+                appendLog({
+                  id: `log-kick-${Date.now()}`,
+                  roundNumber: currentBattleState?.round || 0,
+                  kingdomId: 'system',
+                  message: `🚫 Vương quốc [${kickedK?.name || payload.kickedKingdomId}] đã bị đuổi khỏi phòng chờ.`,
+                  createdAt: new Date().toLocaleTimeString()
+                });
+              }
+              return;
+            }
+
             // Fetch current state from the Zustand store
             const currentBattleState = useBattleStore.getState().battleState;
             if (!currentBattleState) return;
 
             if (type === 'ROUND_START') {
-              // Update round and kingdoms resources
-              const updatedKingdoms = currentBattleState.kingdoms.map(k => {
-                const nextK = payload.kingdoms?.find((pk: any) => pk.id === k.id);
-                return nextK ? { ...k, ...nextK } : k;
-              });
+              // If the map is not initialized yet (tiles are empty), fetch complete state
+              if (currentBattleState.tiles.length === 0) {
+                battleApi.getBattleState(battleId)
+                  .then((state) => {
+                    setBattleState(state);
+                  })
+                  .catch((err) => {
+                    console.error('[WebSocket] Failed to fetch full battle state on ROUND_START:', err);
+                  });
+              } else {
+                // Update round and kingdoms resources
+                const updatedKingdoms = currentBattleState.kingdoms.map(k => {
+                  const nextK = payload.kingdoms?.find((pk: Partial<Kingdom>) => pk.id === k.id);
+                  return nextK ? { ...k, ...nextK } : k;
+                });
 
-              setBattleState({
-                ...currentBattleState,
-                round: payload.round,
-                kingdoms: updatedKingdoms
-              });
+                setBattleState({
+                  ...currentBattleState,
+                  round: payload.round,
+                  status: 'RUNNING',
+                  kingdoms: updatedKingdoms
+                });
+              }
             } 
             else if (type === 'DISASTER_TRIGGERED') {
               // Update kingdoms if any
@@ -156,13 +221,13 @@ export function useBattleSocket(battleId: string) {
             else if (type === 'ACTION_EXECUTED') {
               // Update tiles
               const updatedTiles = currentBattleState.tiles.map(t => {
-                const ut = payload.updatedTiles?.find((upt: any) => upt.id === t.id || upt.code === t.code);
+                const ut = payload.updatedTiles?.find((upt: Partial<Tile>) => upt.id === t.id || upt.code === t.code);
                 return ut ? { ...t, ...ut } : t;
               });
 
               // Update kingdoms resources
               const updatedKingdoms = currentBattleState.kingdoms.map(k => {
-                const uk = payload.updatedKingdoms?.find((upk: any) => upk.id === k.id);
+                const uk = payload.updatedKingdoms?.find((upk: Partial<Kingdom>) => upk.id === k.id);
                 return uk ? { ...k, ...uk } : k;
               });
 

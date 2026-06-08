@@ -22,7 +22,7 @@ const kingdomSchema = z.object({
 
 const formSchema = z.object({
   maxRound: z.number().min(5, 'Số vòng tối thiểu là 5').max(200, 'Số vòng tối đa là 200'),
-  kingdoms: z.array(kingdomSchema).min(2, 'Cần tối thiểu 2 vương quốc').max(4, 'Chỉ hỗ trợ tối đa 4 vương quốc'),
+  kingdoms: z.array(kingdomSchema).min(1, 'Cần tối thiểu 1 vương quốc').max(4, 'Chỉ hỗ trợ tối đa 4 vương quốc'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -92,6 +92,10 @@ export default function CreateBattlePage() {
         };
         const res = await battleApi.createBattle(payload);
         if (res && res.battleId) {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(`joined-${res.battleId}`, 'true');
+            sessionStorage.setItem(`kingdomId-${res.battleId}`, 'k-1');
+          }
           router.push(`/battles/${res.battleId}`);
         } else {
           alert('Tạo phòng đấu thất bại! Bạn có muốn bật chế độ Mô phỏng Offline không?');
@@ -213,7 +217,7 @@ export default function CreateBattlePage() {
                         </span>
                       </div>
                       
-                      {fields.length > 2 && (
+                      {fields.length > 1 && (
                         <button
                           type="button"
                           onClick={() => remove(idx)}
